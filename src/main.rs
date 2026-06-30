@@ -6,12 +6,14 @@ use std::io::BufWriter;
 use std::io::Write;
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::process::ExitCode;
 
 use clap::Parser;
 
 use crate::args::Args;
 use crate::args::Commands;
 use crate::load_videos::playlist_video_urls;
+use crate::load_videos::playlist_video_urls_unchecked;
 
 mod args;
 mod load_videos;
@@ -29,7 +31,18 @@ struct State {
     videos_up_to_next: Vec<String>,
 }
 
-fn main() -> Result<(), Err> {
+fn main() -> ExitCode {
+    let result = load_and_update();
+
+    if let Err(error) = result {
+        eprintln!("We got an error: {error}");
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+fn load_and_update() -> Result<(), Err> {
     let args = Args::parse();
 
     let path = &args.file;
@@ -45,7 +58,11 @@ fn main() -> Result<(), Err> {
         },
     )?;
 
-    let videos = playlist_video_urls(&state.url)?;
+    let videos = if args.disable_length_checks {
+        playlist_video_urls_unchecked(&state.url)
+    } else {
+        playlist_video_urls(&state.url)
+    }?;
 
     let mut next_video = None;
     if let Some(next_url) = state.videos_up_to_next.last() {
