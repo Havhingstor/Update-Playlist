@@ -1,11 +1,13 @@
 use serde::Deserialize;
-use std::process::Command;
+use std::{fmt::format, process::Command};
 
 use crate::Err;
 
 #[derive(Deserialize)]
 struct Playlist {
     entries: Vec<Entry>,
+    playlist_count: usize,
+    title: String,
 }
 
 #[derive(Deserialize)]
@@ -25,9 +27,30 @@ pub fn playlist_video_urls(mut url: &str) -> Result<Vec<String>, Err> {
 
     let playlist: Playlist = serde_json::from_slice(&output.stdout)?;
 
-    Ok(playlist
+    println!(
+        r#"Loading videos from playlist "{}" with {} videos"#,
+        playlist.title, playlist.playlist_count
+    );
+
+    let result: Vec<_> = playlist
         .entries
         .into_iter()
         .map(|e| format!("https://www.youtube.com/watch?v={}", e.id))
-        .collect())
+        .collect();
+
+    if result.len() != playlist.playlist_count {
+        let error_msg = format_args!(
+            "Possible problem: The playlist has {} entries but we got {}!",
+            playlist.playlist_count,
+            result.len()
+        );
+
+        if result.len() < playlist.playlist_count {
+            return Err(format(error_msg).into());
+        } else {
+            eprintln!("{} - All found videos are added", error_msg)
+        }
+    }
+
+    Ok(result)
 }

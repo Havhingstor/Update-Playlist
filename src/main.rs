@@ -54,7 +54,7 @@ fn main() -> Result<(), Err> {
                 ControlFlow::Break((idx, next_url))
             } else {
                 if !state.videos_up_to_next.contains(new_video) {
-                    println!("New video before the current: {new_video}");
+                    println!("New video was added before the next: {new_video}");
                 }
 
                 ControlFlow::Continue(())
@@ -69,7 +69,7 @@ fn main() -> Result<(), Err> {
     }
 
     let index = if let Some((index, next_url)) = next_video {
-        println!("Next video: {next_url}");
+        println!("Kept next video: {next_url}");
         // We must modify the indices correctly. Since this index is already offset regarding the
         // first video, we only add the FIRST_INDEX offset
         index + FIRST_INDEX
