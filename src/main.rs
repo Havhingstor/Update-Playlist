@@ -12,6 +12,7 @@ use clap::Parser;
 
 use crate::args::Args;
 use crate::args::Commands;
+use crate::args::Order;
 use crate::load_videos::playlist_video_urls;
 use crate::load_videos::playlist_video_urls_unchecked;
 
@@ -23,12 +24,13 @@ type Err = Box<dyn Error>;
 /// The index that the first video is referred by
 const FIRST_INDEX: usize = 1;
 /// The line index that the first video is on in the file
-const FIRST_VIDEO_LINE: usize = 2;
+const FIRST_VIDEO_LINE: usize = 3;
 
 #[derive(Default)]
 struct State {
     url: String,
     videos_up_to_next: Vec<String>,
+    order: Order,
 }
 
 fn main() -> ExitCode {
@@ -50,18 +52,19 @@ fn load_and_update() -> Result<(), Err> {
     let state = args.command.map_or_else(
         || load_old_file(path),
         |val| {
-            let Commands::Add { playlist } = val;
+            let Commands::Add { playlist, order } = val;
             Ok(State {
                 url: playlist,
+                order,
                 ..Default::default()
             })
         },
     )?;
 
     let videos = if args.disable_length_checks {
-        playlist_video_urls_unchecked(&state.url)
+        playlist_video_urls_unchecked(&state.url, &state.order)
     } else {
-        playlist_video_urls(&state.url)
+        playlist_video_urls(&state.url, &state.order)
     }?;
 
     let mut next_video = None;
@@ -100,6 +103,7 @@ fn load_and_update() -> Result<(), Err> {
     writer.write_all(state.url.as_bytes())?;
     writer.write_all(b"\n")?;
 
+    writeln!(writer, "{}", state.order)?;
     writeln!(writer, "{index}")?;
 
     videos.iter().try_for_each(|video| {
@@ -127,6 +131,18 @@ fn load_old_file(path: &Path) -> Result<State, Err> {
     } else {
         return Err(format!(
             "The file {} was empty! It must at least contain the URL of the playlist",
+            path.to_string_lossy()
+        )
+        .into());
+    };
+
+    if let Some((_, line)) = iter.next()
+        && let Ok(order) = line.parse::<Order>()
+    {
+        result.order = order;
+    } else {
+        return Err(format!(
+            "The file {} must contain a order in the second line!",
             path.to_string_lossy()
         )
         .into());
